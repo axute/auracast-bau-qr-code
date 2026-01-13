@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Auracast BAU QR Generator (Pro)</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1rem 3rem;
+        }
+        h1, h2 {
+            margin-bottom: 0.3rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1rem 2rem;
+            align-items: start;
+        }
+        .field-group {
+            margin-bottom: 0.7rem;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.15rem;
+        }
+        .hint {
+            font-size: 0.75rem;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 0.3rem 0.4rem;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 5rem;
+            font-family: monospace;
+            resize: vertical;
+        }
+        button {
+            padding: 0.45rem 0.8rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-right: 0.5rem;
+            margin-top: 0.3rem;
+        }
+        #qrcode {
+            margin-top: 1rem;
+        }
+        #qrText {
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            background: #f5f5f5;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+        }
+        .section {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #ddd;
+        }
+        .error {
+            color: #b00020;
+            font-size: 0.8rem;
+            margin-top: 0.3rem;
+        }
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            margin-top: 0.5rem;
+        }
+        .row > * {
+            flex: 0 0 auto;
+        }
+    </style>
+    <!-- QR-Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+<h1>Auracast BAU QR Generator (Pro)</h1>
+<p class="hint">
+    Erzeugt BAU-QR-Codes im Format <code>BLUETOOTH:UUID:184F;...;;</code> mit allen relevanten Feldern.
+</p>
+
+<div class="section">
+    <h2>Presets</h2>
+    <div class="row">
+        <label for="preset">Profil:</label>
+        <select id="preset">
+            <option value="custom">Custom / manuell</option>
+            <option value="public_stereo">Public Stereo (ohne Passwort)</option>
+            <option value="encrypted_stereo">Encrypted Stereo (mit Passwort)</option>
+            <option value="mono_public">Mono Public (ohne Passwort)</option>
+        </select>
+        <button id="applyPresetBtn">Preset anwenden</button>
+    </div>
+    <p class="hint">
+        Presets setzen sinnvolle Default-Werte. Broadcast Name / IDs / Passwort kannst du danach anpassen.
+    </p>
+</div>
+
+<div class="section">
+    <h2>BAU-Felder</h2>
+    <div class="grid">
+        <div>
+            <div class="field-group">
+                <label for="bn">BN – Broadcast Name (wird Base64-kodiert)</label>
+                <input id="bn" type="text" value="">
+                <div class="hint">z. B. der Name, den der Stick sendet.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="bi">BI – Broadcast ID (Hex, 3 Byte)</label>
+                <input id="bi" type="text" value="">
+                <div class="hint">Aus Service Data (UUID 0x1852), z. B. <code>EA87F4</code>.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="bc">BC – Broadcast Code / Passwort (wird Base64-kodiert)</label>
+                <input id="bc" type="text" value="">
+                <div class="hint">Leer lassen für Public Broadcast (AT wird dann auf 1 gesetzt).</div>
+            </div>
+
+            <div class="field-group">
+                <label for="at">AT – Announcement Type</label>
+                <select id="at">
+                    <option value="1">1 – Public Broadcast</option>
+                    <option value="2" selected>2 – Encrypted Broadcast</option>
+                    <option value="3">3 – Targeted</option>
+                    <option value="4">4 – Vendor-Specific</option>
+                </select>
+                <div class="hint">Wenn BC gesetzt ist, in der Praxis i. d. R. 2.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="sq">SQ – Sequence Number (0–255)</label>
+                <input id="sq" type="number" min="0" max="255" value="1">
+                <div class="hint">Versionierung des QR-Codes – bei Änderungen hochzählen.</div>
+            </div>
+        </div>
+
+        <div>
+            <div class="field-group">
+                <label for="ad">AD – Announcement Data (Hex)</label>
+                <input id="ad" type="text" value="">
+                <div class="hint">Hex-Payload, z. B. Adresse/Meta. Kann leer bleiben.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="as">AS – Audio Stream Count</label>
+                <input id="as" type="number" min="1" max="8" value="2">
+                <div class="hint">1 = mono, 2 = stereo etc.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="ns">NS – Number of Subgroups</label>
+                <input id="ns" type="number" min="1" max="8" value="1">
+                <div class="hint">Typisch 1.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="nb">NB – Number of BIS</label>
+                <input id="nb" type="number" min="1" max="32" value="2">
+                <div class="hint">Anzahl Broadcast Isochronous Streams.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="bs">BS – BIS Mask (Hex)</label>
+                <input id="bs" type="text" value="FFFFFFFF">
+                <div class="hint">Bitmaske aktiver BIS, z. B. <code>FFFFFFFF</code>.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="pi">PI – Presentation Info (Hex)</label>
+                <input id="pi" type="text" value="A0">
+                <div class="hint">Audio-Qualität/Präsentation, implementierungsspezifisch.</div>
+            </div>
+
+            <div class="field-group">
+                <label for="sm">SM – Service Metadata (Base64)</label>
+                <input id="sm" type="text" value="">
+                <div class="hint">Base64-kodierte Audio-/LC3-Config. Kann generisch bleiben.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <div class="row">
+        <button id="generateBtn">QR-Code aktualisieren</button>
+        <button id="downloadBtn">QR als PNG speichern</button>
+        <button id="copyTextBtn">BAU-String kopieren</button>
+    </div>
+</div>
+
+<div class="section">
+    <h2>QR-Code & BAU-String</h2>
+    <div class="grid">
+        <div>
+            <div id="qrcode"></div>
+        </div>
+        <div>
+            <label>Generierter BAU-String:</label>
+            <textarea id="qrText" readonly></textarea>
+        </div>
+    </div>
+</div>
+
+<script>
+    // UTF-8-sicheres Base64
+    function toBase64(str) {
+        return btoa(unescape(encodeURIComponent(str)));
+    }
+
+    function isHex(str) {
+        return /^[0-9a-fA-F]*$/.test(str);
+    }
+
+    function normalizeHex(str) {
+        return (str || "").trim().toUpperCase();
+    }
+
+    function buildBauString(fields) {
+        // UUID für BAU ist fix 184F
+        const parts = ["BLUETOOTH:UUID:184F"];
+
+        // Pflichtfelder
+        parts.push("BN:" + fields.BN);
+        parts.push("AT:" + fields.AT);
+        parts.push("SQ:" + fields.SQ);
+        parts.push("BI:" + fields.BI);
+
+        // Optional: BC nur, wenn gesetzt
+        if (fields.BC) {
+            parts.push("BC:" + fields.BC);
+        }
+
+        // Optional / Meta
+        if (fields.AD) parts.push("AD:" + fields.AD);
+        if (fields.AS != null) parts.push("AS:" + fields.AS);
+        if (fields.NS != null) parts.push("NS:" + fields.NS);
+        if (fields.NB != null) parts.push("NB:" + fields.NB);
+        if (fields.BS) parts.push("BS:" + fields.BS);
+        if (fields.PI) parts.push("PI:" + fields.PI);
+        if (fields.SM) parts.push("SM:" + fields.SM);
+
+        return parts.join(";") + ";;";
+    }
+
+    let qrInstance = null;
+
+    function generateQr() {
+        const errEl = document.getElementById("error");
+        errEl.textContent = "";
+
+        const name = document.getElementById("bn").value.trim();
+        const biRaw = document.getElementById("bi").value.trim();
+        const bcRaw = document.getElementById("bc").value.trim();
+        const atSel = document.getElementById("at").value;
+        const sqVal = parseInt(document.getElementById("sq").value, 10);
+
+        const adRaw = document.getElementById("ad").value.trim();
+        const asVal = parseInt(document.getElementById("as").value, 10);
+        const nsVal = parseInt(document.getElementById("ns").value, 10);
+        const nbVal = parseInt(document.getElementById("nb").value, 10);
+        const bsRaw = document.getElementById("bs").value.trim();
+        const piRaw = document.getElementById("pi").value.trim();
+        const smRaw = document.getElementById("sm").value.trim();
+
+        if (!name) {
+            errEl.textContent = "Broadcast Name (BN) darf nicht leer sein.";
+            return;
+        }
+
+        let bi = normalizeHex(biRaw);
+        if (!bi || !isHex(bi)) {
+            errEl.textContent = "Broadcast ID (BI) muss ein Hex-Wert sein.";
+            return;
+        }
+        // Typisch 3 Byte, aber wir erzwingen es nicht strikt:
+        // if (bi.length !== 6) { ... }
+
+        let at = parseInt(atSel, 10);
+        let bcBase64 = "";
+        if (bcRaw) {
+            try {
+                bcBase64 = toBase64(bcRaw);
+                // Wenn Passwort gesetzt, AT >= 2 sinnvoll
+                if (at < 2) at = 2;
+            } catch (e) {
+                errEl.textContent = "BC konnte nicht Base64-kodiert werden.";
+                return;
+            }
+        } else {
+            // Kein Passwort -> Public
+            if (at !== 1) {
+                at = 1;
+            }
+        }
+
+        const bnBase64 = toBase64(name);
+
+        const ad = normalizeHex(adRaw);
+        if (ad && !isHex(ad)) {
+            errEl.textContent = "AD muss ein Hex-Wert sein.";
+            return;
+        }
+
+        const bs = normalizeHex(bsRaw);
+        if (bs && !isHex(bs)) {
+            errEl.textContent = "BS muss ein Hex-Wert sein.";
+            return;
+        }
+
+        const pi = normalizeHex(piRaw);
+        if (pi && !isHex(pi)) {
+            errEl.textContent = "PI muss ein Hex-Wert sein.";
+            return;
+        }
+
+        const fields = {
+            BN: bnBase64,
+            AT: at,
+            SQ: isNaN(sqVal) ? 1 : Math.max(0, Math.min(255, sqVal)),
+            BI: bi,
+            BC: bcBase64 || null,
+            AD: ad || null,
+            AS: isNaN(asVal) ? null : asVal,
+            NS: isNaN(nsVal) ? null : nsVal,
+            NB: isNaN(nbVal) ? null : nbVal,
+            BS: bs || null,
+            PI: pi || null,
+            SM: smRaw || null
+        };
+
+        const bauString = buildBauString(fields);
+
+        document.getElementById("qrText").value = bauString;
+
+        const qrContainer = document.getElementById("qrcode");
+        qrContainer.innerHTML = "";
+
+        qrInstance = new QRCode(qrContainer, {
+            text: bauString,
+            width: 256,
+            height: 256,
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+
+    function downloadPng() {
+        if (!qrInstance) {
+            alert("Bitte zuerst einen QR-Code generieren.");
+            return;
+        }
+        const qrContainer = document.getElementById("qrcode");
+        const img = qrContainer.querySelector("img") || qrContainer.querySelector("canvas");
+        if (!img) {
+            alert("QR-Bild nicht gefunden.");
+            return;
+        }
+
+        let dataUrl;
+        if (img.tagName.toLowerCase() === "img") {
+            dataUrl = img.src;
+        } else {
+            dataUrl = img.toDataURL("image/png");
+        }
+
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = "auracast_bau_qr.png";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function copyBauString() {
+        const textArea = document.getElementById("qrText");
+        const val = textArea.value.trim();
+        if (!val) {
+            alert("Kein BAU-String vorhanden.");
+            return;
+        }
+        navigator.clipboard.writeText(val).then(
+            () => alert("BAU-String in die Zwischenablage kopiert."),
+            () => alert("Kopieren fehlgeschlagen.")
+        );
+    }
+
+    function applyPreset() {
+        const preset = document.getElementById("preset").value;
+
+        // Standard: nichts ändern
+        if (preset === "custom") {
+            return;
+        }
+
+        // Kleine Hilfsfunktion: Felder setzen
+        function setVal(id, val) {
+            document.getElementById(id).value = val;
+        }
+
+        // Gemeinsame Defaults
+        setVal("sq", "1");
+        setVal("ad", "");
+        setVal("bs", "FFFFFFFF");
+        setVal("pi", "A0");
+        setVal("sm", "");
+
+        if (preset === "public_stereo") {
+            setVal("bn", "Auracast_Public");
+            setVal("bi", "");
+            setVal("bc", "");
+            document.getElementById("at").value = "1";
+            setVal("as", "2");
+            setVal("ns", "1");
+            setVal("nb", "2");
+        }
+
+        if (preset === "encrypted_stereo") {
+            setVal("bn", "Auracast_Encrypted");
+            setVal("bi", "");
+            setVal("bc", "");
+            document.getElementById("at").value = "2";
+            setVal("as", "2");
+            setVal("ns", "1");
+            setVal("nb", "2");
+        }
+
+        if (preset === "mono_public") {
+            setVal("bn", "Auracast_Mono");
+            setVal("bi", "");
+            setVal("bc", "");
+            document.getElementById("at").value = "1";
+            setVal("as", "1");
+            setVal("ns", "1");
+            setVal("nb", "1");
+        }
+
+        generateQr();
+    }
+
+    document.getElementById("generateBtn").addEventListener("click", generateQr);
+    document.getElementById("downloadBtn").addEventListener("click", downloadPng);
+    document.getElementById("copyTextBtn").addEventListener("click", copyBauString);
+    document.getElementById("applyPresetBtn").addEventListener("click", applyPreset);
+
+    // Initial mit aktuellen Werten generieren
+    generateQr();
+</script>
+</body>
+</html>
