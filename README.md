@@ -44,7 +44,7 @@ This project is intended for developers, testers, and hobbyists working with BLE
    - Audio configuration fields
 3. The BAU string and QR code update instantly.
 4. Scan the QR code with an Auracast‑capable device to join the broadcast.
-
+5. Enhanced documentation, you will find here: https://www.bluetooth.com/specifications/specs/html/?src=BAU_v1.0/out/en/index-en.html
 ---
 
 ## Hosting
